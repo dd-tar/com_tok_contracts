@@ -33,7 +33,6 @@ import "./Voting.sol";
     }
 
     struct CommunityBacklog{
-        // TODO
         uint256 community;
         uint256 thresholdForTasks; // only for the owner of community
         mapping (uint256 => Task) tasks; // not array to avoid initialization problems, ids from 0
@@ -83,7 +82,6 @@ contract Backlog is Ownable{
         CommunityBacklog storage cb = backlogs[_comId];
         cb.community = _comId;
         cb.thresholdForTasks = 1; // default
-        //backlogs[_comId].push(cb); // backlogId == comId
         backlogExists[_comId] = true;
 
         emit BacklogCreated(_comId);
@@ -110,7 +108,7 @@ contract Backlog is Ownable{
         newTask.creator = msg.sender;
         newTask.name = _name;
         newTask.description = _description;
-        newTask.deadline = block.timestamp + _deadline * 1 hours; // ?
+        newTask.deadline = block.timestamp + _deadline * 1 hours;
         newTask.reward = _reward;
         newTask.status = TaskStatus.Created;
         uint256 creator_id = communityFactory.getMemberTgId(_communityId, msg.sender);
@@ -203,7 +201,7 @@ contract Backlog is Ownable{
             uint256 numberOfWinners = backlogs[_comId].tasks[_taskId].numberOfWinners;
             for(uint i = 0; i < numberOfWinners; i++){
                 bool sent = payable(backlogs[_comId].tasks[_taskId].winners[i])
-                .send(backlogs[_comId].tasks[_taskId].reward * 1e18);
+                .send(backlogs[_comId].tasks[_taskId].reward);
                 require(sent, "Backlog: Failed to send reward");
             }
         }

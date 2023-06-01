@@ -3,12 +3,8 @@ pragma solidity ^0.8.0;
 
 import "./CommunityFactory.sol";
 
-// TODO check
-// import IERC20
-
     struct Proposal{
         address creator;
-        // link for description of Proposal and options to vote for
         // for solutions of tasks it should be formed from Backlog.sol contract
         string proposalDescription;
         uint256 numberOfOptions; // ( 1, 2, ...  numberOfOptions)
@@ -22,13 +18,13 @@ import "./CommunityFactory.sol";
         uint256[] winningOptions;
     }
 
-struct CommunityVoting{
-    mapping(uint256 => Proposal) votings; // ids from 1
-    uint256 numberOfVotings;
+    struct CommunityVoting{
+        mapping(uint256 => Proposal) votings; // ids from 1
+        uint256 numberOfVotings;
 
-    address votingToken; // default: community token
-    uint256 votingThreshold; // min number of people to vote; default: 1
-}
+        address votingToken; // default: community token
+        uint256 votingThreshold; // min number of people to vote; default: 1
+    }
 
 
 contract Voting {
@@ -47,7 +43,7 @@ contract Voting {
     modifier hasVotingTokens(uint256 _comId){
         address token = communityFactory.getMainCommunityToken(_comId);
         uint256 userBalance = IERC20(token).balanceOf(msg.sender);
-        require(userBalance >= communityFactory.getParticipationThreshold(token), "Sender has not enough voting tokens.");
+        require(msg.sender == backlogContract || userBalance >= communityFactory.getParticipationThreshold(token), "Sender has not enough voting tokens.");
         _;
     }
 
@@ -68,9 +64,9 @@ contract Voting {
     );
 
     event ProposalExecuted(
-    address comToken,
-    uint256 proposalId,
-    uint256[] winningOptions
+        address comToken,
+        uint256 proposalId,
+        uint256[] winningOptions
     );
 
     function createCommunityVotings(uint256 _comId, address _votingToken, uint256 _votingThreshold) private onlyVerifiedMember(_comId){
@@ -93,18 +89,18 @@ contract Voting {
         require(_numberOfOptions >= 2 || msg.sender == backlogContract && _numberOfOptions > 0,
             "Wrong number of voting options. Must be at least 2 options for proposals and 1 solution for tasks.");
         require(_deadline > 0, "The deadline can't be in 0 hours");
-        // todo any other requirements?
+
         address comToken = communityFactory.getMainCommunityToken(_comId);
         if(comVotings[_comId].numberOfVotings == 0)
             createCommunityVotings(_comId, comToken, 1);
         uint256 member_id = communityFactory.getMemberTgId(_comId, creator);
-        uint256 prop_id = comVotings[_comId].numberOfVotings++; // ids from 1
+        comVotings[_comId].numberOfVotings += 1;
+        uint256 prop_id = comVotings[_comId].numberOfVotings; // ids from 1
         Proposal storage newProposal = comVotings[_comId].votings[prop_id];
         newProposal.creator = creator;
         newProposal.proposalDescription = _proposal;
         newProposal.numberOfOptions = _numberOfOptions;
         newProposal.deadline = block.timestamp + _deadline * 1 hours;
-        //comVotings[_comId].votings[id] = newProposal;
 
         emit ProposalCreated(comToken, prop_id, member_id, newProposal.proposalDescription,
             newProposal.numberOfOptions, newProposal.deadline);
@@ -165,7 +161,7 @@ contract Voting {
     function changeVotingToken(uint256 _comId, address _newVotingToken) public onlyVerifiedMember(_comId){
         require(communityFactory.isComOwner(_comId, msg.sender), "Only for community owner.");
         require(_newVotingToken != address(0), "Voting token can't be zero address.");
-        require(IERC20(_newVotingToken).balanceOf(msg.sender) != 0, "Should have balanceOf function."); //TODO Should have balanceOf function
+        require(IERC20(_newVotingToken).balanceOf(msg.sender) != 0, "Should have balanceOf function."); // TODO Should have balanceOf function
 
         comVotings[_comId].votingToken = _newVotingToken;
     }
@@ -223,14 +219,4 @@ contract Voting {
         return comVotings[_comId].numberOfVotings;
     }
 
-
-    /*
-    function executeProposal(uint256 _proposalId) public {
-        Proposal storage proposal = proposals[_proposalId];
-        require(msg.sender == proposal.creator, "Only the proposal creator can execute this proposal.");
-        require(proposal.voteCount >= (threshold1 / 2) + 1, "The proposal does not have enough votes to be executed.");
-        require(!proposal.executed, "The proposal has already been executed.");
-        // todo Execute the proposal here
-        proposal.executed = true;
-    }*/
 }

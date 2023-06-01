@@ -10,21 +10,13 @@ import "./CommunityToken.sol";
         address owner;
         address wallet;
         address mainToken;
-        // List of Users-Members (?) mb we don't need it bc we only need the verification of tgID ???
         mapping(address => Member) members;
         mapping(uint256 => address) memberAddress;   // todo set True when creating a Member
         uint256 numberOfMembers; // increment when creating, decrement when burning members; NOT equal to Verified members
         uint256 numberOfVerifiedMembers; // increment when member.verify >= threshold, decrement when burning members
-
-        uint256 verificationThreshold; // todo: 2 as a default
-        uint256 joiningTokenThreshold;
-        // todo:
-        // verify threshold (default: 2 || admin)
-        // voting threshold (default: ?? )
-        // create proposal threshold
-        // create task threshold
-        // or one threshold for everything
         mapping(address => bool) memberVerified;
+        uint256 verificationThreshold;
+        uint256 joiningTokenThreshold;
     }
 
     struct Member{
@@ -53,7 +45,7 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         require(IERC20(comToken).balanceOf(msg.sender) >= communities[_comId].joiningTokenThreshold,
             "You must have { joiningTokenThreshold } community tokens to join this community.");
         require(communities[_comId].members[msg.sender].addr == address(0),
-            "You are already a member (address already exists)."); // will fail if there is no such member? DOES MEMBER NEED ANY INITIALIZATION???
+            "You are already a member (address already exists).");
         require(communities[_comId].memberAddress[_tgID] == address(0), "This tgID already exists.");
 
         communities[_comId].memberAddress[_tgID] = msg.sender;
@@ -92,12 +84,11 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         address _member,
         address _verifier
     ) private view returns (bool verified){
-        for(uint i = 0; i < communities[_comId].members[_member].verified.length; i++) // HERE
+        for(uint i = 0; i < communities[_comId].members[_member].verified.length; i++)
             if (communities[_comId].members[_member].verified[i] == _verifier)
                 return true;
         return false;
     }
-// todo: memberVerified event
 
     event VerificationAccepted(uint256 comId, uint256 senderId, uint256 memberId);
     event MemberVerified(uint256 comId, uint256 memberId);
@@ -114,7 +105,7 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         require(comm.members[member].addr != address(0), "Member does not exist.");
         require(isVerifiedMember(_comId, msg.sender), "Sender is not a Verified member.");
         // check that sender didn't vote before
-        require(!didSenderVerifyMember(_comId, member, msg.sender), "Sender has already verified this user."); // todo *
+        require(!didSenderVerifyMember(_comId, member, msg.sender), "Sender has already verified this user.");
         // check that member has less than threshold verifications
         require(!comm.memberVerified[member], "Member already verified.");
 
@@ -212,22 +203,19 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
     event TokenCreated(uint256 comId, address token);
     event CommunityCreated(uint256 comId, address comWallet, address comToken, uint256 creatorId, address creatorAddress);
 
-    // todo create community when creating token / IMPORTING token / creating task / creating voting proposal
-
     function createCommunity(
         address _wallet,
         address _mainToken,
         uint256 creatorTgID)
     public
     returns(uint256 comId){
-        // todo require
         require(!communityPerWallet.contains(_wallet), "Community already exists.");
 
         uint256 id = communities.length;
         communities.push();
         Community storage newCom = communities[id];
 
-        newCom.owner = msg.sender; // todo check if it will work as expected (call from other func/contract)
+        newCom.owner = msg.sender;
         newCom.wallet = _wallet;
         newCom.mainToken = _mainToken;
         newCom.verificationThreshold = 1;
@@ -264,7 +252,6 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         require(_comId < communities.length, "Community doesn't exist.");
         require(msg.sender == communities[_comId].owner || msg.sender == communities[_comId].wallet,
             "Only for community wallet or owner.");
-        // TODO
         address currentToken = communities[_comId].mainToken;
         tokenToCommunity[currentToken] = 0;
 
@@ -301,8 +288,14 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         return addr;
     }
 
-    function changeCommunityToken() public{
-        // TODO only owner, check com exists
+    function changeCommunityToken(uint256 _comId, address _token) public{
+        require(_comId < communities.length, "Community doesn't exist.");
+        require(msg.sender == communities[_comId].owner || msg.sender == communities[_comId].wallet,
+            "Only for community wallet or owner.");
+        address currentToken = communities[_comId].mainToken;
+        tokenToCommunity[currentToken] = 0;
+        communities[_comId].mainToken = _token;
+        tokenToCommunity[_token] = _comId;
     }
 
     /*----view functions---------------------------------*/
@@ -335,7 +328,6 @@ contract CommunityFactory is Ownable, ReentrancyGuard {
         return communities[comId].joiningTokenThreshold;
     }
 
-    // todo check view functions after changes
     function isComOwner(uint256 _comId, address _user) public view returns(bool){
         require(_comId < communities.length, "Community doesn't exists.");
         return _user == communities[_comId].owner;
